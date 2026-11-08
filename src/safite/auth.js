@@ -99,3 +99,4 @@ export async function refreshSafiteToken(oldToken) {
     throw new SafiteAuthError(`Error refrescando sesión de Safite: ${err.message}`);
   }
 }
+

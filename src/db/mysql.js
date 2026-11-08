@@ -44,3 +44,4 @@ export async function query(sql, params = []) {
   const [rows] = await p.execute(sql, params);
   return rows;
 }
+

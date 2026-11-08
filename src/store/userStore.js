@@ -197,3 +197,4 @@ export async function logDispatch({ userId, canal, numeroManifiesto, radicadoRnd
     [userId, canal, numeroManifiesto, radicadoRndc, estado, JSON.stringify(detalle || {})]
   );
 }
+

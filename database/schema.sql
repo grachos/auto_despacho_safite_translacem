@@ -68,3 +68,4 @@ CREATE TABLE IF NOT EXISTS despachos_log (
     INDEX idx_manifiesto (numero_manifiesto),
     INDEX idx_usuario_fecha (usuario_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

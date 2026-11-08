@@ -86,3 +86,4 @@ export async function handleWhatsAppMessage(message) {
 
   return sendWhatsAppMessage(fromPhone, respuesta);
 }
+
