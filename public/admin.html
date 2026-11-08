@@ -400,8 +400,8 @@
           <td>${u.whatsapp_phone ? '✅ ' + u.whatsapp_phone : '—'}</td>
           <td><span class="badge badge-active">${u.status}</span></td>
           <td>
-            <div style="display: flex; gap: 0.4rem; align-items: center;">
-              ${u.telegram_chat_id ? `<button onclick="desvincularTelegram(${u.id}, '${u.nombre.replace(/'/g, "\\'")}')" style="background: #eab308; color: #000; padding: 0.25rem 0.5rem; font-size: 0.75rem;">🔓 Desvincular</button>` : ''}
+            <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+              ${u.telegram_chat_id ? `<button onclick="desvincularTelegram(${u.id}, '${u.nombre.replace(/'/g, "\\'")}')" style="background: #eab308; color: #000; padding: 0.25rem 0.5rem; font-size: 0.75rem;">🔓 Desvincular</button>` : `<button onclick="generarCodigoTelegram(${u.id}, '${u.nombre.replace(/'/g, "\\'")}')" style="background: #0284c7; color: #fff; padding: 0.25rem 0.5rem; font-size: 0.75rem;">🔑 Vincular Telegram</button>`}
               <button onclick="eliminarUsuario(${u.id}, '${u.nombre.replace(/'/g, "\\'")}')" style="background: #dc2626; color: #fff; padding: 0.25rem 0.5rem; font-size: 0.75rem;">🗑️ Eliminar</button>
             </div>
           </td>
@@ -532,6 +532,34 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al desvincular');
         alert(data.mensaje || 'Telegram desvinculado.');
+        cargarDatos();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    async function generarCodigoTelegram(userId, nombre) {
+      try {
+        const res = await fetch('/api/admin/usuarios', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': adminKey
+          },
+          body: JSON.stringify({ id: userId, action: 'code' })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al generar código');
+
+        const abrir = confirm(
+          `🔑 Código de Vinculación generado para ${nombre}:\n\n` +
+          `VINCULAR ${data.codigo}\n\n` +
+          `(Válido por 15 minutos)\n\n` +
+          `¿Deseas abrir Telegram directamente para vincular este usuario?`
+        );
+        if (abrir && data.telegramUrl) {
+          window.open(data.telegramUrl, '_blank');
+        }
         cargarDatos();
       } catch (err) {
         alert('Error: ' + err.message);

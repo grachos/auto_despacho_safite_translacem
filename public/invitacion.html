@@ -169,16 +169,38 @@
 
       <!-- Selector de método -->
       <div class="tabs">
-        <button type="button" class="tab-btn active" id="tab-btn-cred" onclick="switchTab('cred')">NIT y Contraseña</button>
-        <button type="button" class="tab-btn" id="tab-btn-token" onclick="switchTab('token')">Pegar Token de Safite</button>
+        <button type="button" class="tab-btn active" id="tab-btn-token" onclick="switchTab('token')">Pegar Token de Safite (Recomendado)</button>
+        <button type="button" class="tab-btn" id="tab-btn-cred" onclick="switchTab('cred')">NIT y Contraseña</button>
       </div>
 
+      <!-- Formulario 2: Token Directo (Default) -->
+      <form id="login-form-token">
+        <div style="background: #0f2744; border: 1px solid #1e40af; border-radius: 0.5rem; padding: 0.85rem; margin-bottom: 1rem; font-size: 0.85rem; color: #93c5fd;">
+          💡 <strong>¿Cómo obtener tu token en 5 segundos?</strong><br>
+          1. Ten tu sesión abierta en <a href="https://app.safiteapp.com/" target="_blank" style="color: #60a5fa; font-weight: bold;">Safite</a>.<br>
+          2. Presiona <code>F12</code> (o clic derecho > Inspeccionar) > ve a <strong>Consola</strong>.<br>
+          3. Escribe <code>copy(localStorage.token)</code> y presiona <code>Enter</code>.<br>
+          4. Pégalo aquí abajo y pulsa <strong>Vincular con este Token</strong>.
+        </div>
+
+        <div class="form-group">
+          <label for="token-safite">Token de Sesión de Safite (JWT)</label>
+          <textarea id="token-safite" rows="4" placeholder="Pega aquí tu token eyJhbGciOiJIUzI1Ni..." required></textarea>
+        </div>
+
+        <button type="submit" id="btn-submit-token">Vincular con este Token</button>
+      </form>
+
       <!-- Formulario 1: NIT + Usuario + Clave -->
-      <form id="login-form-cred">
+      <form id="login-form-cred" style="display: none;">
+        <div style="background: #451a03; border: 1px solid #78350f; color: #fde68a; padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.85rem;">
+          ⚠️ <strong>Aviso sobre reCAPTCHA:</strong> Safite restringe el login por contraseña a su dominio <code>app.safiteapp.com</code>. Si el servidor responde con <em>RECAP-01</em>, utiliza la pestaña <strong>"Pegar Token de Safite"</strong>.
+        </div>
+
         <div class="form-group">
           <label for="nit">NIT de la Empresa</label>
-          <input type="text" id="nit" placeholder="Ej: 900123456" required autocomplete="organization">
-          <div class="hint">El NIT registrado de tu empresa en Safite (sin dígito de verificación).</div>
+          <input type="text" id="nit" placeholder="Ej: 901599040-4" required autocomplete="organization">
+          <div class="hint">El NIT registrado de tu empresa en Safite (con dígito de verificación).</div>
         </div>
 
         <div class="form-group">
@@ -192,19 +214,6 @@
         </div>
 
         <button type="submit" id="btn-submit-cred">Validar Acceso y Generar Código</button>
-      </form>
-
-      <!-- Formulario 2: Token Directo -->
-      <form id="login-form-token" style="display: none;">
-        <div class="form-group">
-          <label for="token-safite">Token JWT de Safite</label>
-          <textarea id="token-safite" rows="4" placeholder="Pega aquí tu token eyJhbGciOiJIUzI1Ni..." required></textarea>
-          <div class="hint">
-            En tu sesión abierta de Safite en el navegador, presiona <code>F12</code> > Consola y ejecuta <code>localStorage.getItem('token')</code>.
-          </div>
-        </div>
-
-        <button type="submit" id="btn-submit-token">Vincular con este Token</button>
       </form>
     </div>
 
@@ -222,7 +231,7 @@
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const tokenInvitacion = urlParams.get('token');
-    let currentTab = 'cred';
+    let currentTab = 'token';
 
     if (!tokenInvitacion) {
       document.getElementById('form-container').innerHTML = `

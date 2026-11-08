@@ -3,7 +3,7 @@
  * Permite al administrador eliminar usuarios o desvincular sus cuentas de Telegram/WhatsApp.
  */
 
-import { deleteUser, unlinkTelegramUser } from '../../src/store/userStore.js';
+import { deleteUser, unlinkTelegramUser, generateLinkingCode, findUserById } from '../../src/store/userStore.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'DELETE') {
@@ -27,6 +27,21 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (action === 'code') {
+      const user = await findUserById(id);
+      if (!user) return res.status(404).json({ error: 'Usuario no encontrado.' });
+      const codigo = await generateLinkingCode(id, 'TELEGRAM');
+      const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'Agent_TranslacemBot';
+      return res.status(200).json({
+        success: true,
+        codigo,
+        usuario: user.safite_usuario,
+        nombre: user.nombre,
+        telegramUrl: `https://t.me/${botUsername}?start=vincular_${codigo}`,
+        mensaje: `Código de vinculación generado: VINCULAR ${codigo}`,
+      });
+    }
+
     if (action === 'unlink') {
       const ok = await unlinkTelegramUser(id);
       return res.status(200).json({
@@ -45,3 +60,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: error.message || 'Error al procesar acción sobre usuario.' });
   }
 }
+
