@@ -46,7 +46,7 @@ function withTimeout(promise, ms) {
 }
 
 /** Logs one user in and returns { token, expiresAt }. Throws on failure. */
-export async function loginWithBrowser(browser, { usuario, password, idEmpresa }) {
+export async function loginWithBrowser(browser, { usuario, password, idEmpresa }, mark = () => {}) {
   const loginUrl = process.env.SAFITE_LOGIN_URL;
   if (!loginUrl) throw new Error('Falta SAFITE_LOGIN_URL.');
 
@@ -57,11 +57,14 @@ export async function loginWithBrowser(browser, { usuario, password, idEmpresa }
   const page = await context.newPage();
 
   try {
+    mark('goto_login');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('obtenerEmpresas'), { timeout: 35000 }),
       page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 35000 }),
     ]);
+    mark('wait_form');
     await page.waitForSelector('#nameUserL', { state: 'visible', timeout: 20000 });
+    mark('typing');
 
     await page.click('#nameUserL');
     await page.type('#nameUserL', usuario, { delay: 30 });
@@ -80,12 +83,14 @@ export async function loginWithBrowser(browser, { usuario, password, idEmpresa }
       }
     }
 
+    mark('submit');
     const [authRes] = await Promise.all([
       page.waitForResponse((r) => r.url().includes('authenticate'), { timeout: 25000 }),
       page.click('#formUsuarioEmpresa button[type="submit"]'),
     ]);
     if (authRes.status() !== 200) throw new Error(`Safite respondió ${authRes.status()}`);
 
+    mark('auth_response_' + authRes.status());
     await page.waitForTimeout(1500);
     const token = await page.evaluate(() => localStorage.getItem('token'));
     if (!token) throw new Error('No se encontró el token JWT tras el login.');
@@ -147,22 +152,32 @@ export async function renewTokens({
   withinHours = 6,
   userId = null,
   maxUsers = Infinity,
+  trace = [],
   budgetMs = 240000,
   perUserMs = 50000,
 } = {}) {
   const started = Date.now();
+  const mark = (stage) => {
+    trace.push({ ms: Date.now() - started, stage });
+    console.log(`[Renew] +${Date.now() - started}ms ${stage}`);
+  };
+  mark('query_users');
   const all = await getUsersToRenew({ withinHours, userId });
   const users = all.slice(0, maxUsers);
   const total = all.length;
   const results = [];
+  mark(`users_found_${total}`);
   if (!users.length) return { results, pending: 0 };
 
-  const browser = await launchBrowser();
+  mark('launch_browser');
+  const browser = await withTimeout(launchBrowser(), 25000);
+  mark('browser_ready');
   try {
     for (const u of users) {
       if (Date.now() - started + perUserMs > budgetMs) break;
+      mark(`login_start_${u.usuario}`);
       try {
-        const out = await withTimeout(loginWithBrowser(browser, u), perUserMs);
+        const out = await withTimeout(loginWithBrowser(browser, u, mark), perUserMs);
         await saveToken(u.id, out);
         results.push({ id: u.id, usuario: u.usuario, ok: true, expiresAt: out.expiresAt });
       } catch (err) {
@@ -170,7 +185,8 @@ export async function renewTokens({
       }
     }
   } finally {
-    await browser.close().catch(() => {});
+    await Promise.race([browser.close().catch(() => {}), new Promise((r) => setTimeout(r, 3000))]);
+    mark('browser_closed');
   }
   return { results, pending: Math.max(total - results.length, 0) };
 }
