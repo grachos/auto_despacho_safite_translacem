@@ -3,13 +3,9 @@
  * 
  * Recorre todos los usuarios de la tabla `usuarios` en MySQL:
  * - Descifra la contraseña de cada usuario en memoria (AES-256-GCM).
- * - Utiliza técnicas stealth para pasar Google reCAPTCHA v3 de forma nativa (score 0.9).
+ * - Utiliza la URL directa con nit y keyCompany para activar obtenerEmpresas automáticamente.
  * - Inicia sesión en SAFITE, captura el JWT (24 horas de vigencia) de localStorage.
  * - Actualiza la fecha de expiración y el token en MySQL para cada usuario individualmente.
- * 
- * SEGURIDAD:
- * - Las contraseñas NUNCA se imprimen en logs de GitHub ni en consola.
- * - Cada usuario se procesa en un contexto de navegador totalmente aislado.
  */
 
 import { chromium } from 'playwright';
@@ -17,11 +13,11 @@ import 'dotenv/config';
 import { query } from '../src/db/mysql.js';
 import { decrypt } from '../src/crypto.js';
 
-const SAFITE_LOGIN_URL = process.env.SAFITE_LOGIN_URL || 
-  'https://app.safiteapp.com/login.html?keyCompany=LVY7SMEezWqi7lO739SQcu6SoQtu819JU64ddFhBjY';
-
 const SAFITE_NIT = process.env.SAFITE_NIT || '901599040-4';
 const DEFAULT_ID_EMPRESA = process.env.SAFITE_ID_EMPRESA || '1282';
+
+const SAFITE_LOGIN_URL = process.env.SAFITE_LOGIN_URL || 
+  `https://app.safiteapp.com/login.html?nit=${SAFITE_NIT}&keyCompany=LVY7SMEezWqi7lO739SQcu6SoQtu819JU64ddFhBjY`;
 
 /**
  * Autentica un usuario en Safite y extrae su token JWT
@@ -31,53 +27,38 @@ async function authenticateUserInSafite(browser, user) {
 
   console.log(`\n▶ [Playwright] Renovando sesión para: "${nombre}" (Usuario: ${safite_usuario}, ID: ${id})...`);
 
-  // Crear contexto aislado para evitar contaminación de cookies o storage entre usuarios
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
   });
 
-  // Bypass stealth anti-bot detection para reCAPTCHA v3
   await context.addInitScript(() => {
-    Object.defineProperty(navigator, 'webdriver', {
-      get: () => undefined,
-    });
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
   });
 
   const page = await context.newPage();
 
   try {
-    console.log(`  └─ [1/5] Cargando portal de Safite...`);
-    await page.goto(SAFITE_LOGIN_URL, { 
-      waitUntil: 'domcontentloaded', 
-      timeout: 35000 
-    });
+    console.log(`  └─ [1/4] Navegando a portal Safite (resolviendo empresa automáticamente)...`);
+    
+    // Esperar respuesta de obtenerEmpresas disparada automáticamente por la URL con nit y keyCompany
+    await Promise.all([
+      page.waitForResponse(r => r.url().includes('obtenerEmpresas'), { timeout: 35000 }),
+      page.goto(SAFITE_LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 35000 })
+    ]);
 
-    // Esperar a que la página inicialice Vue
-    await page.waitForTimeout(2000);
-    await page.waitForSelector('#nit, #nameUserL', { state: 'visible', timeout: 25000 });
+    await page.waitForSelector('#nameUserL', { state: 'visible', timeout: 20000 });
 
-    const isUserVisible = await page.isVisible('#nameUserL');
-    if (!isUserVisible) {
-      console.log(`  └─ [2/5] Ingresando NIT ${SAFITE_NIT}...`);
-      await page.click('#nit');
-      await page.type('#nit', SAFITE_NIT, { delay: 40 });
-      await page.waitForTimeout(400);
-      await page.click('#btn-submit-Nit');
-      await page.waitForSelector('#nameUserL', { state: 'visible', timeout: 20000 });
-    }
-
-    console.log(`  └─ [3/5] Llenando credenciales de acceso...`);
+    console.log(`  └─ [2/4] Llenando credenciales de acceso...`);
     await page.click('#nameUserL');
-    await page.type('#nameUserL', safite_usuario, { delay: 35 });
+    await page.type('#nameUserL', safite_usuario, { delay: 30 });
 
     await page.click('#passUserL');
-    await page.type('#passUserL', plainPassword, { delay: 35 });
+    await page.type('#passUserL', plainPassword, { delay: 30 });
 
-    // Seleccionar empresa si está disponible
     const select = await page.$('#empresaTipoS');
     if (select && await select.isVisible()) {
-      console.log(`  └─ [4/5] Seleccionando empresa (${idEmpresa})...`);
+      console.log(`  └─ [3/4] Seleccionando empresa (${idEmpresa})...`);
       try {
         await page.selectOption('#empresaTipoS', String(idEmpresa));
       } catch {
@@ -88,22 +69,25 @@ async function authenticateUserInSafite(browser, user) {
       }
     }
 
-    console.log(`  └─ [5/5] Iniciando sesión (reCAPTCHA v3 nativo)...`);
-    await Promise.all([
-      page.waitForResponse(r => r.url().includes('/login/authenticate'), { timeout: 25000 }),
+    console.log(`  └─ [4/4] Enviando formulario de autenticación...`);
+    const [authRes] = await Promise.all([
+      page.waitForResponse(r => r.url().includes('authenticate'), { timeout: 25000 }),
       page.click('#formUsuarioEmpresa button[type="submit"]')
     ]);
 
-    // Esperar guardado de token en localStorage
-    await page.waitForTimeout(2000);
+    if (authRes.status() !== 200) {
+      throw new Error(`Safite respondió con status ${authRes.status()}`);
+    }
+
+    await page.waitForTimeout(1500);
     const token = await page.evaluate(() => localStorage.getItem('token'));
 
     if (!token) {
-      throw new Error('Safite no retornó token. Verifica las credenciales del usuario.');
+      throw new Error('No se encontró el token JWT en localStorage tras el login.');
     }
 
     // Decodificar expiración del JWT
-    let expiresAt = new Date(Date.now() + 24 * 3600 * 1000); // 24 horas por defecto
+    let expiresAt = new Date(Date.now() + 24 * 3600 * 1000);
     try {
       const parts = token.split('.');
       if (parts.length >= 2) {
@@ -114,7 +98,7 @@ async function authenticateUserInSafite(browser, user) {
       }
     } catch {}
 
-    // Actualizar en MySQL para este usuario específico
+    // Actualizar en MySQL
     await query(
       `UPDATE usuarios 
        SET safite_token = ?, safite_token_expires_at = ?,
@@ -155,7 +139,6 @@ async function launchStealthBrowser() {
   try {
     return await chromium.launch({ ...launchOptions, channel: 'chrome' });
   } catch {
-    console.log('ℹ Canal "chrome" no disponible, usando Chromium estándar...');
     return await chromium.launch(launchOptions);
   }
 }
@@ -169,7 +152,6 @@ async function main() {
   console.log(` Fecha de ejecución: ${new Date().toLocaleString('es-CO')}`);
   console.log('='.repeat(70));
 
-  // 1. Obtener todos los usuarios activos de MySQL
   let usersToRenew = [];
   try {
     const rows = await query(`
@@ -180,7 +162,6 @@ async function main() {
 
     for (const r of rows) {
       if (!r.safite_password_encrypted || r.safite_password_encrypted === 'TOKEN_AUTH' || r.safite_password_encrypted === 'SESSION_EXTENSION') {
-        console.log(`ℹ Usuario ${r.safite_usuario} (${r.nombre}) no tiene contraseña cifrada. Se omite.`);
         continue;
       }
 
@@ -201,11 +182,9 @@ async function main() {
     console.error('❌ Error leyendo usuarios de la base de datos:', dbErr.message);
   }
 
-  // Fallback si no hay usuarios en BD con clave
   if (usersToRenew.length === 0) {
     const envUser = process.env.SAFITE_USER || 'PRUEBASAFITE';
     const envPass = process.env.SAFITE_PASSWORD || 'SAFITE123/*';
-    console.log(`ℹ Usando cuenta principal por defecto (${envUser})...`);
     usersToRenew.push({
       id: 1,
       nombre: 'Usuario Principal',
@@ -215,12 +194,11 @@ async function main() {
     });
   }
 
-  console.log(`\n📋 Despachadores a renovar en esta ronda: ${usersToRenew.length}`);
+  console.log(`📋 Despachadores a renovar en esta ronda: ${usersToRenew.length}`);
 
-  // 2. Iniciar navegador Playwright con flags stealth
   const browser = await launchStealthBrowser();
-
   const summary = [];
+
   for (const user of usersToRenew) {
     const res = await authenticateUserInSafite(browser, user);
     summary.push(res);
