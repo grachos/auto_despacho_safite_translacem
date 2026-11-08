@@ -1,0 +1,47 @@
+name: Auto-Renovar Token SAFITE (24h)
+
+on:
+  schedule:
+    # Se ejecuta cada 12 horas (a las 00:00 y 12:00 UTC -> 7:00 PM y 7:00 AM hora Colombia)
+    - cron: '0 */12 * * *'
+  workflow_dispatch: # Permite ejecutar manualmente con un clic desde la pestaña Actions en GitHub
+
+jobs:
+  renew-token:
+    name: Iniciar Sesión Headless y Sincronizar Token
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar Dependencias de Playwright
+        run: |
+          npm install playwright dotenv
+          npx playwright install --with-deps chromium
+
+      - name: Ejecutar Login Automático con Playwright
+        env:
+          SAFITE_LOGIN_URL: ${{ secrets.SAFITE_LOGIN_URL || 'https://app.safiteapp.com/login.html?keyCompany=LVY7SMEezWqi7lO739SQcu6SoQtu819JU64ddFhBjY' }}
+          SAFITE_NIT: ${{ secrets.SAFITE_NIT || '901599040-4' }}
+          SAFITE_USER: ${{ secrets.SAFITE_USER || 'PRUEBASAFITE' }}
+          SAFITE_PASSWORD: ${{ secrets.SAFITE_PASSWORD || 'SAFITE123/*' }}
+          SAFITE_ID_EMPRESA: ${{ secrets.SAFITE_ID_EMPRESA || '1282' }}
+          SYNC_API_URL: ${{ secrets.SYNC_API_URL || 'https://agentedespachotranslacem.vercel.app/api/auth/safite-token-sync' }}
+        run: |
+          node scripts/safite-auto-login.js
+
+      - name: Subir Captura en Caso de Error
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safite-login-error-screenshot
+          path: safite-login-error.png
+          retention-days: 3

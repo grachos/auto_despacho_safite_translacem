@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Safite & RNDC Auto-Sync",
+  "version": "1.0.0",
+  "description": "Sincroniza automáticamente la sesión activa de Safite con el Asistente de Despachos de Telegram.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://app.safiteapp.com/*",
+    "https://agentedespachotranslacem.vercel.app/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://app.safiteapp.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
+

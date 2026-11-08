@@ -6,7 +6,8 @@
   "main": "src/safiteClient.js",
   "scripts": {
     "test": "node test/testClient.js",
-    "dev": "node test/testClient.js"
+    "dev": "node test/testClient.js",
+    "safite:renew": "node scripts/safite-auto-login.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
