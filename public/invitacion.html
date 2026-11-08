@@ -176,11 +176,17 @@
       <!-- Formulario 2: Token Directo (Default) -->
       <form id="login-form-token">
         <div style="background: #0f2744; border: 1px solid #1e40af; border-radius: 0.5rem; padding: 0.85rem; margin-bottom: 1rem; font-size: 0.85rem; color: #93c5fd;">
-          💡 <strong>¿Cómo obtener tu token en 5 segundos?</strong><br>
-          1. Ten tu sesión abierta en <a href="https://app.safiteapp.com/" target="_blank" style="color: #60a5fa; font-weight: bold;">Safite</a>.<br>
-          2. Presiona <code>F12</code> (o clic derecho > Inspeccionar) > ve a <strong>Consola</strong>.<br>
-          3. Escribe <code>copy(localStorage.token)</code> y presiona <code>Enter</code>.<br>
-          4. Pégalo aquí abajo y pulsa <strong>Vincular con este Token</strong>.
+          💡 <strong>Opciones para obtener tu token desde Safite:</strong><br><br>
+          <strong>Opción Rápida (Consola de Safite):</strong><br>
+          1. En tu pestaña abierta de <a href="https://app.safiteapp.com/" target="_blank" style="color: #60a5fa; font-weight: bold;">Safite</a>, presiona <code>F12</code> > ve a <strong>Consola</strong>.<br>
+          2. Escribe <code>copy(localStorage.token)</code> y presiona <code>Enter</code>.<br>
+          3. Pégalo aquí abajo y pulsa <strong>Vincular con este Token</strong>.<br><br>
+          <strong>Opción 1 Clic (Marcador de Chrome):</strong><br>
+          Arrastra este botón a tu barra de marcadores: 
+          <a href="javascript:(function(){const t=localStorage.getItem('token');if(!t){alert('Inicia sesión en Safite primero');return;}prompt('Copia tu token de Safite:',t);})()" 
+             style="display: inline-block; background: #2563eb; color: #fff; padding: 0.2rem 0.6rem; border-radius: 0.3rem; text-decoration: none; font-weight: bold; margin-top: 0.3rem;">
+            ⭐ Obtener Token de Safite
+          </a>
         </div>
 
         <div class="form-group">
@@ -231,7 +237,18 @@
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const tokenInvitacion = urlParams.get('token');
+    const safiteTokenParam = urlParams.get('safiteToken');
     let currentTab = 'token';
+
+    if (safiteTokenParam) {
+      const textarea = document.getElementById('token-safite');
+      if (textarea) textarea.value = safiteTokenParam;
+      if (tokenInvitacion) {
+        setTimeout(() => {
+          document.getElementById('login-form-token')?.dispatchEvent(new Event('submit', { cancelable: true }));
+        }, 400);
+      }
+    }
 
     if (!tokenInvitacion) {
       document.getElementById('form-container').innerHTML = `
