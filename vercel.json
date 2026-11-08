@@ -2,12 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "functions": {
-    "api/**/*.js": {
-      "maxDuration": 60
-    },
     "api/cron/renew-tokens.js": {
       "maxDuration": 60,
       "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
+    },
+    "api/**/*.js": {
+      "maxDuration": 60
     }
   },
   "crons": [
