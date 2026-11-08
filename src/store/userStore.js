@@ -37,7 +37,7 @@ export async function registerOrUpdateUser({ nombre, usuario, password, tenantId
     await query(
       `UPDATE usuarios 
        SET nombre = ?, safite_password_encrypted = ?, safite_tenant_id = ?, safite_id_empresa = ?,
-           safite_token = ?, safite_token_expires_at = ?, status = 'ACTIVE'
+           safite_token = COALESCE(?, safite_token), safite_token_expires_at = COALESCE(?, safite_token_expires_at), status = 'ACTIVE'
        WHERE id = ?`,
       [nombre, encryptedPassword, tenantId, idEmpresa, token, expiresAt, userId]
     );
