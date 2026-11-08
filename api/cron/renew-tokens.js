@@ -19,8 +19,15 @@ export default async function handler(req, res) {
   const userId = req.query.userId ? Number(req.query.userId) : null;
   const withinHours = req.query.hours ? Number(req.query.hours) : 6;
 
+  const trace = [];
   try {
-    const { results, pending } = await renewTokens({ withinHours, userId, maxUsers: 1, budgetMs: 55000, perUserMs: 48000 });
+    const work = renewTokens({ withinHours, userId, maxUsers: 1, budgetMs: 55000, perUserMs: 40000, trace });
+    const guard = new Promise((resolve) => setTimeout(() => resolve(null), 52000));
+    const outcome = await Promise.race([work, guard]);
+    if (!outcome) {
+      return res.status(504).json({ success: false, error: 'Timeout interno (52 s). Ver trace.', trace });
+    }
+    const { results, pending } = outcome;
     const failed = results.filter((r) => !r.ok);
 
     const chatId = process.env.ADMIN_TELEGRAM_CHAT_ID;
@@ -37,6 +44,7 @@ export default async function handler(req, res) {
       failed: failed.length,
       pending,
       results,
+      trace,
     });
   } catch (err) {
     console.error('[renew-tokens]', err);
