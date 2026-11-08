@@ -24,9 +24,6 @@
     "ai-agent"
   ],
   "engines": {
-    "node": "20.x"
-  },
-  "devDependencies": {
-    "playwright": "^1.65.0"
+    "node": "26.x"
   }
 }
