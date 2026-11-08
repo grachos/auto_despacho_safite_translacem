@@ -1,4 +1,4 @@
-name: Auto-Renovar Token SAFITE (24h)
+name: Auto-Renovar Token SAFITE (Multi-Usuario 24h)
 
 on:
   schedule:
@@ -8,9 +8,9 @@ on:
 
 jobs:
   renew-token:
-    name: Iniciar Sesión Headless y Sincronizar Token
+    name: Renovación Headless Multi-Usuario
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout Repositorio
@@ -24,24 +24,28 @@ jobs:
 
       - name: Instalar Dependencias de Playwright
         run: |
-          npm install playwright dotenv
-          npx playwright install --with-deps chromium
+          npm install playwright mysql2 dotenv
+          npx playwright install --with-deps chrome chromium
 
-      - name: Ejecutar Login Automático con Playwright
+      - name: Ejecutar Renovación Playwright
         env:
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST || 'srv2184.hstgr.io' }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER || 'u279856486_safiteTnslaCem' }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD || 'b!vL@Zc7Y' }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE || 'u279856486_safiteTnslaCem' }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || '3306' }}
+          MYSQL_SSL: ${{ secrets.MYSQL_SSL || 'false' }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY || 'clave_secreta_super_segura_32_caracteres_minimo!' }}
           SAFITE_LOGIN_URL: ${{ secrets.SAFITE_LOGIN_URL || 'https://app.safiteapp.com/login.html?keyCompany=LVY7SMEezWqi7lO739SQcu6SoQtu819JU64ddFhBjY' }}
           SAFITE_NIT: ${{ secrets.SAFITE_NIT || '901599040-4' }}
-          SAFITE_USER: ${{ secrets.SAFITE_USER || 'PRUEBASAFITE' }}
-          SAFITE_PASSWORD: ${{ secrets.SAFITE_PASSWORD || 'SAFITE123/*' }}
           SAFITE_ID_EMPRESA: ${{ secrets.SAFITE_ID_EMPRESA || '1282' }}
-          SYNC_API_URL: ${{ secrets.SYNC_API_URL || 'https://agentedespachotranslacem.vercel.app/api/auth/safite-token-sync' }}
         run: |
           node scripts/safite-auto-login.js
 
-      - name: Subir Captura en Caso de Error
+      - name: Subir Capturas en Caso de Error
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: safite-login-error-screenshot
-          path: safite-login-error.png
+          name: safite-login-error-screenshots
+          path: error-login-*.png
           retention-days: 3

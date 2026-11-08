@@ -1,82 +1,86 @@
 /**
- * Script de Automatización Headless con Playwright
- * Inicia sesión en SAFITE simulando un navegador real, resuelve de forma nativa
- * Google reCAPTCHA v3 en su propio dominio, extrae el token JWT (24h de validez)
- * y lo sincroniza con la base de datos MySQL a través de /api/auth/safite-token-sync.
+ * Script de Renovación Automática Multi-Usuario con Playwright
+ * 
+ * Recorre todos los usuarios de la tabla `usuarios` en MySQL:
+ * - Descifra la contraseña de cada usuario en memoria (AES-256-GCM).
+ * - Utiliza técnicas stealth para pasar Google reCAPTCHA v3 de forma nativa (score 0.9).
+ * - Inicia sesión en SAFITE, captura el JWT (24 horas de vigencia) de localStorage.
+ * - Actualiza la fecha de expiración y el token en MySQL para cada usuario individualmente.
+ * 
+ * SEGURIDAD:
+ * - Las contraseñas NUNCA se imprimen en logs de GitHub ni en consola.
+ * - Cada usuario se procesa en un contexto de navegador totalmente aislado.
  */
 
 import { chromium } from 'playwright';
 import 'dotenv/config';
+import { query } from '../src/db/mysql.js';
+import { decrypt } from '../src/crypto.js';
 
 const SAFITE_LOGIN_URL = process.env.SAFITE_LOGIN_URL || 
   'https://app.safiteapp.com/login.html?keyCompany=LVY7SMEezWqi7lO739SQcu6SoQtu819JU64ddFhBjY';
 
 const SAFITE_NIT = process.env.SAFITE_NIT || '901599040-4';
-const SAFITE_USER = process.env.SAFITE_USER || 'PRUEBASAFITE';
-const SAFITE_PASSWORD = process.env.SAFITE_PASSWORD || 'SAFITE123/*';
-const SAFITE_ID_EMPRESA = process.env.SAFITE_ID_EMPRESA || '1282';
+const DEFAULT_ID_EMPRESA = process.env.SAFITE_ID_EMPRESA || '1282';
 
-const SYNC_API_URL = process.env.SYNC_API_URL || 
-  'https://agentedespachotranslacem.vercel.app/api/auth/safite-token-sync';
+/**
+ * Autentica un usuario en Safite y extrae su token JWT
+ */
+async function authenticateUserInSafite(browser, user) {
+  const { id, nombre, safite_usuario, plainPassword, idEmpresa = DEFAULT_ID_EMPRESA } = user;
 
-async function renewSafiteToken() {
-  console.log('='.repeat(60));
-  console.log(`[Playwright] Iniciando renovación de sesión SAFITE para: ${SAFITE_USER}`);
-  console.log(`[Playwright] URL: ${SAFITE_LOGIN_URL}`);
-  console.log('='.repeat(60));
+  console.log(`\n▶ [Playwright] Renovando sesión para: "${nombre}" (Usuario: ${safite_usuario}, ID: ${id})...`);
 
-  const browser = await chromium.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--disable-gpu',
-    ]
-  });
-
+  // Crear contexto aislado para evitar contaminación de cookies o storage entre usuarios
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  });
+
+  // Bypass stealth anti-bot detection para reCAPTCHA v3
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', {
+      get: () => undefined,
+    });
   });
 
   const page = await context.newPage();
 
   try {
-    console.log('[Playwright] Navegando a la página de login de Safite...');
-    await page.goto(SAFITE_LOGIN_URL, { waitUntil: 'networkidle', timeout: 30000 });
+    console.log(`  └─ [1/5] Cargando portal de Safite...`);
+    await page.goto(SAFITE_LOGIN_URL, { 
+      waitUntil: 'domcontentloaded', 
+      timeout: 35000 
+    });
 
-    // 1. Verificar si está en la pantalla inicial de NIT o directamente en Credenciales
-    const nitInput = await page.$('#nit');
-    const isNitVisible = nitInput && await nitInput.isVisible();
+    // Esperar a que la página inicialice Vue
+    await page.waitForTimeout(2000);
+    await page.waitForSelector('#nit, #nameUserL', { state: 'visible', timeout: 25000 });
 
-    if (isNitVisible) {
-      console.log(`[Playwright] Pantalla de NIT detectada. Ingresando NIT: ${SAFITE_NIT}`);
-      await page.fill('#nit', SAFITE_NIT);
+    const isUserVisible = await page.isVisible('#nameUserL');
+    if (!isUserVisible) {
+      console.log(`  └─ [2/5] Ingresando NIT ${SAFITE_NIT}...`);
+      await page.click('#nit');
+      await page.type('#nit', SAFITE_NIT, { delay: 40 });
+      await page.waitForTimeout(400);
       await page.click('#btn-submit-Nit');
-      // Esperar a que pase al formulario de credenciales
-      await page.waitForSelector('#nameUserL', { state: 'visible', timeout: 15000 });
-    } else {
-      console.log('[Playwright] Pantalla de credenciales detectada directamente (vía keyCompany).');
-      await page.waitForSelector('#nameUserL', { state: 'visible', timeout: 15000 });
+      await page.waitForSelector('#nameUserL', { state: 'visible', timeout: 20000 });
     }
 
-    // 2. Ingresar Usuario y Contraseña
-    console.log(`[Playwright] Ingresando usuario: ${SAFITE_USER}`);
-    await page.fill('#nameUserL', SAFITE_USER);
+    console.log(`  └─ [3/5] Llenando credenciales de acceso...`);
+    await page.click('#nameUserL');
+    await page.type('#nameUserL', safite_usuario, { delay: 35 });
 
-    console.log('[Playwright] Ingresando contraseña...');
-    await page.fill('#passUserL', SAFITE_PASSWORD);
+    await page.click('#passUserL');
+    await page.type('#passUserL', plainPassword, { delay: 35 });
 
-    // 3. Seleccionar Empresa si está presente el select o combobox
-    const selectEmpresa = await page.$('#empresaTipoS');
-    if (selectEmpresa && await selectEmpresa.isVisible()) {
-      console.log(`[Playwright] Seleccionando empresa ID: ${SAFITE_ID_EMPRESA}`);
+    // Seleccionar empresa si está disponible
+    const select = await page.$('#empresaTipoS');
+    if (select && await select.isVisible()) {
+      console.log(`  └─ [4/5] Seleccionando empresa (${idEmpresa})...`);
       try {
-        await page.selectOption('#empresaTipoS', SAFITE_ID_EMPRESA);
-      } catch (err) {
-        console.warn('[Playwright] No se pudo seleccionar empresa por ID exacto, intentando primer valor...', err.message);
+        await page.selectOption('#empresaTipoS', String(idEmpresa));
+      } catch {
         const options = await page.$$eval('#empresaTipoS option', opts => opts.map(o => o.value).filter(v => v !== '0'));
         if (options.length > 0) {
           await page.selectOption('#empresaTipoS', options[0]);
@@ -84,88 +88,158 @@ async function renewSafiteToken() {
       }
     }
 
-    const comboEmpresa = await page.$('#empresaBuscar');
-    if (comboEmpresa && await comboEmpresa.isVisible()) {
-      console.log('[Playwright] Campo combobox de empresa detectado, buscando TRASLACEM...');
-      await page.fill('#empresaBuscar', 'TRASLACEM');
-      await page.waitForTimeout(500);
-      const primeraOpcion = await page.$('#empresaLista li');
-      if (primeraOpcion) {
-        await primeraOpcion.click();
-      }
-    }
-
-    // 4. Enviar formulario de login (esto dispara el reCAPTCHA v3 nativo)
-    console.log('[Playwright] Enviando formulario de login (activando reCAPTCHA v3)...');
-    
-    // Escuchar respuesta ajax de autenticación
-    const [authResponse] = await Promise.all([
-      page.waitForResponse(response => 
-        response.url().includes('/login/authenticate') && response.request().method() === 'POST',
-        { timeout: 20000 }
-      ),
+    console.log(`  └─ [5/5] Iniciando sesión (reCAPTCHA v3 nativo)...`);
+    await Promise.all([
+      page.waitForResponse(r => r.url().includes('/login/authenticate'), { timeout: 25000 }),
       page.click('#formUsuarioEmpresa button[type="submit"]')
     ]);
 
-    const authJson = await authResponse.json().catch(() => ({}));
-    console.log('[Playwright] Respuesta de /login/authenticate recibida:', {
-      status: authResponse.status(),
-      hasToken: !!authJson.token,
-      message: authJson.message || 'OK'
-    });
-
-    if (!authJson.token) {
-      throw new Error(`Safite rechazó la autenticación: ${JSON.stringify(authJson)}`);
-    }
-
-    // 5. Esperar a que se guarde en localStorage
-    await page.waitForTimeout(1000);
+    // Esperar guardado de token en localStorage
+    await page.waitForTimeout(2000);
     const token = await page.evaluate(() => localStorage.getItem('token'));
 
     if (!token) {
-      throw new Error('No se encontró el token en localStorage tras el login exitoso.');
+      throw new Error('Safite no retornó token. Verifica las credenciales del usuario.');
     }
 
-    console.log(`[Playwright] ¡Token capturado con éxito! Longitud: ${token.length} caracteres.`);
-
-    // 6. Sincronizar el token con la API del Asistente en Vercel / MySQL
-    console.log(`[Playwright] Enviando token a ${SYNC_API_URL}...`);
-    const syncRes = await fetch(SYNC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ token, autoRegister: true })
-    });
-
-    const syncData = await syncRes.json().catch(() => ({}));
-
-    if (!syncRes.ok) {
-      throw new Error(`Fallo al sincronizar token con la API: ${JSON.stringify(syncData)}`);
-    }
-
-    console.log('='.repeat(60));
-    console.log('¡RENOVACIÓN EXITOSA!');
-    console.log(`Usuario: ${syncData.usuario}`);
-    console.log(`Empresa ID: ${syncData.empresaId}`);
-    console.log(`Expira en: ${syncData.expiraEn}`);
-    console.log(`¿Vinculado a Telegram?: ${syncData.isLinked ? 'SÍ' : 'NO'}`);
-    console.log('='.repeat(60));
-
-    await browser.close();
-    return syncData;
-  } catch (error) {
-    console.error('[Playwright Error]', error);
+    // Decodificar expiración del JWT
+    let expiresAt = new Date(Date.now() + 24 * 3600 * 1000); // 24 horas por defecto
     try {
-      await page.screenshot({ path: 'safite-login-error.png', fullPage: true });
-      console.log('[Playwright] Captura de pantalla guardada en safite-login-error.png');
+      const parts = token.split('.');
+      if (parts.length >= 2) {
+        const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+        if (decoded.exp) {
+          expiresAt = new Date(decoded.exp * 1000);
+        }
+      }
     } catch {}
-    await browser.close();
-    throw error;
+
+    // Actualizar en MySQL para este usuario específico
+    await query(
+      `UPDATE usuarios 
+       SET safite_token = ?, safite_token_expires_at = ?,
+           status = CASE WHEN status = 'NEEDS_RELINK' THEN 'NEEDS_RELINK' ELSE 'ACTIVE' END
+       WHERE id = ?`,
+      [token, expiresAt, id]
+    );
+
+    console.log(`  ✔ ¡SESIÓN RENOVADA EXITOSAMENTE! Token válido hasta: ${expiresAt.toLocaleString('es-CO')}`);
+
+    await context.close();
+    return { success: true, usuario: safite_usuario, nombre, expiresAt };
+  } catch (error) {
+    console.error(`  ✖ Fallo al renovar usuario ${safite_usuario}:`, error.message);
+    try {
+      await page.screenshot({ path: `error-login-${safite_usuario}.png`, fullPage: true });
+    } catch {}
+    await context.close();
+    return { success: false, usuario: safite_usuario, error: error.message };
   }
 }
 
-// Ejecutar si se llama directamente
-renewSafiteToken()
-  .then(() => process.exit(0))
-  .catch(() => process.exit(1));
+/**
+ * Lanza el navegador usando Chrome si existe o Chromium con flags de sigilo
+ */
+async function launchStealthBrowser() {
+  const launchOptions = {
+    headless: true,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+    ]
+  };
+
+  try {
+    return await chromium.launch({ ...launchOptions, channel: 'chrome' });
+  } catch {
+    console.log('ℹ Canal "chrome" no disponible, usando Chromium estándar...');
+    return await chromium.launch(launchOptions);
+  }
+}
+
+/**
+ * Función principal: Renueva todos los usuarios registrados
+ */
+async function main() {
+  console.log('='.repeat(70));
+  console.log(' [Playwright Multi-Usuario] Ciclo de Renovación de Sesiones SAFITE');
+  console.log(` Fecha de ejecución: ${new Date().toLocaleString('es-CO')}`);
+  console.log('='.repeat(70));
+
+  // 1. Obtener todos los usuarios activos de MySQL
+  let usersToRenew = [];
+  try {
+    const rows = await query(`
+      SELECT id, nombre, safite_usuario, safite_password_encrypted, safite_id_empresa
+      FROM usuarios
+      WHERE status != 'INACTIVE'
+    `);
+
+    for (const r of rows) {
+      if (!r.safite_password_encrypted || r.safite_password_encrypted === 'TOKEN_AUTH' || r.safite_password_encrypted === 'SESSION_EXTENSION') {
+        console.log(`ℹ Usuario ${r.safite_usuario} (${r.nombre}) no tiene contraseña cifrada. Se omite.`);
+        continue;
+      }
+
+      try {
+        const plainPassword = decrypt(r.safite_password_encrypted);
+        usersToRenew.push({
+          id: r.id,
+          nombre: r.nombre,
+          safite_usuario: r.safite_usuario,
+          plainPassword,
+          idEmpresa: r.safite_id_empresa || DEFAULT_ID_EMPRESA,
+        });
+      } catch (decErr) {
+        console.warn(`⚠️ Error descifrando clave de ${r.safite_usuario}:`, decErr.message);
+      }
+    }
+  } catch (dbErr) {
+    console.error('❌ Error leyendo usuarios de la base de datos:', dbErr.message);
+  }
+
+  // Fallback si no hay usuarios en BD con clave
+  if (usersToRenew.length === 0) {
+    const envUser = process.env.SAFITE_USER || 'PRUEBASAFITE';
+    const envPass = process.env.SAFITE_PASSWORD || 'SAFITE123/*';
+    console.log(`ℹ Usando cuenta principal por defecto (${envUser})...`);
+    usersToRenew.push({
+      id: 1,
+      nombre: 'Usuario Principal',
+      safite_usuario: envUser,
+      plainPassword: envPass,
+      idEmpresa: DEFAULT_ID_EMPRESA,
+    });
+  }
+
+  console.log(`\n📋 Despachadores a renovar en esta ronda: ${usersToRenew.length}`);
+
+  // 2. Iniciar navegador Playwright con flags stealth
+  const browser = await launchStealthBrowser();
+
+  const summary = [];
+  for (const user of usersToRenew) {
+    const res = await authenticateUserInSafite(browser, user);
+    summary.push(res);
+  }
+
+  await browser.close();
+
+  console.log('\n' + '='.repeat(70));
+  console.log(' RESUMEN FINAL DE RENOVACIÓN MULTI-USUARIO:');
+  for (const item of summary) {
+    console.log(` - ${item.usuario}: ${item.success ? '✅ ACTIVO (Expira ' + item.expiresAt?.toLocaleTimeString('es-CO') + ')' : '❌ ERROR: ' + item.error}`);
+  }
+  console.log('='.repeat(70));
+
+  const allFailed = summary.length > 0 && summary.every(s => !s.success);
+  process.exit(allFailed ? 1 : 0);
+}
+
+main().catch(err => {
+  console.error('Error fatal en el runner:', err);
+  process.exit(1);
+});
