@@ -2,8 +2,8 @@
  * GET /api/cron/renew-tokens  (called by the Hostinger cron)
  * Auth: Authorization: Bearer <CRON_SECRET>
  * Optional query: ?userId=<id> to force one user, ?hours=<n> window (default 6).
- * Renews as many expiring Safite sessions as fit in the time budget; the next
- * run picks up the rest. On failures it alerts the admin via Telegram
+ * Hobby plan (60 s): renews ONE user per call (the soonest to expire); each
+ * cron run picks up the next one. On failures it alerts the admin via Telegram
  * (set ADMIN_TELEGRAM_CHAT_ID).
  */
 
@@ -11,7 +11,7 @@ import { requireCron } from '../../src/auth/guards.js';
 import { renewTokens } from '../../src/safite/browserLogin.js';
 import { TelegramBotClient } from '../../src/telegram/api.js';
 
-export const config = { maxDuration: 300 };
+export const config = { maxDuration: 60 };
 
 export default async function handler(req, res) {
   if (!requireCron(req, res)) return;
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   const withinHours = req.query.hours ? Number(req.query.hours) : 6;
 
   try {
-    const { results, pending } = await renewTokens({ withinHours, userId });
+    const { results, pending } = await renewTokens({ withinHours, userId, maxUsers: 1, budgetMs: 55000, perUserMs: 48000 });
     const failed = results.filter((r) => !r.ok);
 
     const chatId = process.env.ADMIN_TELEGRAM_CHAT_ID;

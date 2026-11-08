@@ -37,6 +37,14 @@ function jwtExpiry(token) {
   return new Date(Date.now() + 24 * 3600 * 1000);
 }
 
+function withTimeout(promise, ms) {
+  let t;
+  const timeout = new Promise((_, rej) => {
+    t = setTimeout(() => rej(new Error(`Timeout de ${Math.round(ms / 1000)} s renovando sesión.`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
+}
+
 /** Logs one user in and returns { token, expiresAt }. Throws on failure. */
 export async function loginWithBrowser(browser, { usuario, password, idEmpresa }) {
   const loginUrl = process.env.SAFITE_LOGIN_URL;
@@ -135,9 +143,17 @@ export async function saveToken(userId, { token, expiresAt }) {
 /**
  * Renews as many users as fit in `budgetMs`. Returns per-user results.
  */
-export async function renewTokens({ withinHours = 6, userId = null, budgetMs = 240000, perUserMs = 50000 } = {}) {
+export async function renewTokens({
+  withinHours = 6,
+  userId = null,
+  maxUsers = Infinity,
+  budgetMs = 240000,
+  perUserMs = 50000,
+} = {}) {
   const started = Date.now();
-  const users = await getUsersToRenew({ withinHours, userId });
+  const all = await getUsersToRenew({ withinHours, userId });
+  const users = all.slice(0, maxUsers);
+  const total = all.length;
   const results = [];
   if (!users.length) return { results, pending: 0 };
 
@@ -146,7 +162,7 @@ export async function renewTokens({ withinHours = 6, userId = null, budgetMs = 2
     for (const u of users) {
       if (Date.now() - started + perUserMs > budgetMs) break;
       try {
-        const out = await loginWithBrowser(browser, u);
+        const out = await withTimeout(loginWithBrowser(browser, u), perUserMs);
         await saveToken(u.id, out);
         results.push({ id: u.id, usuario: u.usuario, ok: true, expiresAt: out.expiresAt });
       } catch (err) {
@@ -156,5 +172,5 @@ export async function renewTokens({ withinHours = 6, userId = null, budgetMs = 2
   } finally {
     await browser.close().catch(() => {});
   }
-  return { results, pending: users.length - results.length };
+  return { results, pending: Math.max(total - results.length, 0) };
 }
