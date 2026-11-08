@@ -4,13 +4,10 @@
  */
 
 import { query } from '../../src/db/mysql.js';
+import { requireCron } from '../../src/auth/guards.js';
 
 export default async function handler(req, res) {
-  // Validación de seguridad para Cron Jobs de Vercel
-  const authHeader = req.headers.authorization;
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ error: 'No autorizado' });
-  }
+  if (!requireCron(req, res)) return;
 
   try {
     // 1. Vencer invitaciones expiradas

@@ -178,7 +178,7 @@
       <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔒</div>
       <h2 style="margin: 0 0 0.5rem 0;">Acceso de Administrador</h2>
       <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.5;">
-        Ingresa el valor de la variable <strong>ADMIN_KEY</strong> configurada en Vercel (por defecto: <code>clave_admin_secreta_12345</code>).
+        Ingresa el valor de la variable <strong>ADMIN_KEY</strong> configurada en Vercel.
       </p>
 
       <div id="auth-error" class="error-msg"></div>
@@ -338,7 +338,7 @@
       });
 
       if (res.status === 401) {
-        throw new Error('❌ Clave incorrecta. Debe ser idéntica a la variable ADMIN_KEY de Vercel (por defecto: clave_admin_secreta_12345).');
+        throw new Error('❌ Clave incorrecta. Debe ser idéntica a la variable ADMIN_KEY de Vercel.');
       }
 
       if (!res.ok) {

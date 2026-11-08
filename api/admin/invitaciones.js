@@ -4,20 +4,14 @@
  */
 
 import { createInvitation } from '../../src/store/userStore.js';
+import { requireAdmin } from '../../src/auth/guards.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido. Use POST.' });
   }
 
-  // Validación de seguridad de Administrador
-  const adminKey = req.headers['x-admin-key'] || req.query.adminKey || req.body?.adminKey;
-  const expectedKey = (process.env.ADMIN_KEY || '').trim().replace(/^["']|["']$/g, '');
-  const providedKey = (adminKey || '').trim().replace(/^["']|["']$/g, '');
-
-  if (expectedKey && providedKey !== expectedKey) {
-    return res.status(401).json({ error: 'No autorizado. Se requiere x-admin-key válida.' });
-  }
+  if (!requireAdmin(req, res)) return;
 
   const { nombreDestinatario, creadoPor = 'ADMIN' } = req.body || {};
 

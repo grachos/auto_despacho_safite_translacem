@@ -33,12 +33,12 @@ jobs:
           MYSQL_USER: ${{ secrets.MYSQL_USER }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || '3306' }}
-          MYSQL_SSL: ${{ secrets.MYSQL_SSL || 'false' }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
+          MYSQL_SSL: ${{ secrets.MYSQL_SSL }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
-          SAFITE_LOGIN_URL: ${{ secrets.SAFITE_LOGIN_URL || 'https://app.safiteapp.com/login.html?nit=901599040-4&keyCompany=LVY7SMEezWqi7lO739SQcu6SoQtu819JU64ddFhBjY' }}
-          SAFITE_NIT: ${{ secrets.SAFITE_NIT || '901599040-4' }}
-          SAFITE_ID_EMPRESA: ${{ secrets.SAFITE_ID_EMPRESA || '1282' }}
+          SAFITE_LOGIN_URL: ${{ secrets.SAFITE_LOGIN_URL }}
+          SAFITE_NIT: ${{ secrets.SAFITE_NIT }}
+          SAFITE_ID_EMPRESA: ${{ secrets.SAFITE_ID_EMPRESA }}
         run: |
           node scripts/safite-auto-login.js
 

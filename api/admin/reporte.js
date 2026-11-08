@@ -4,23 +4,14 @@
  */
 
 import { query } from '../../src/db/mysql.js';
+import { requireAdmin } from '../../src/auth/guards.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido.' });
   }
 
-  // Validación de seguridad de Administrador
-  const adminKey = req.headers['x-admin-key'] || req.query.adminKey || req.body?.adminKey;
-  const expectedKey = (process.env.ADMIN_KEY || '').trim().replace(/^["']|["']$/g, '');
-  const providedKey = (adminKey || '').trim().replace(/^["']|["']$/g, '');
-
-  if (expectedKey && providedKey !== expectedKey) {
-    return res.status(401).json({
-      error: 'Clave de administrador incorrecta.',
-      hint: 'Verifica la variable ADMIN_KEY en tu panel de Vercel (Project Settings > Environment Variables).'
-    });
-  }
+  if (!requireAdmin(req, res)) return;
 
   try {
     // 1. Usuarios registrados
