@@ -1,5 +1,5 @@
 /**
- * Vercel Serverless Function: POST /api/admin/setup-webhook
+ * Vercel Serverless Function: POST & GET /api/admin/setup-webhook
  * Permite vincular el Webhook de Telegram con 1 clic desde el Panel de Administración.
  */
 
@@ -19,16 +19,32 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'No autorizado. Se requiere x-admin-key válida.' });
   }
 
+  // Comprobar si el token de Telegram está configurado
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    return res.status(200).json({
+      success: false,
+      configured: false,
+      error: 'TELEGRAM_BOT_TOKEN no está configurado en las variables de entorno de Vercel.',
+      message: 'Agrega TELEGRAM_BOT_TOKEN en Vercel (Project Settings > Environment Variables) y haz un Redeploy.',
+    });
+  }
+
   try {
-    const bot = new TelegramBotClient();
+    const bot = new TelegramBotClient(token);
 
     // Si es GET, consultar el estado actual
     if (req.method === 'GET') {
       const [botInfo, webhookInfo] = await Promise.all([
-        bot.getMe(),
-        bot.getWebhookInfo(),
+        bot.getMe().catch((e) => ({ error: e.message })),
+        bot.getWebhookInfo().catch((e) => ({ error: e.message })),
       ]);
-      return res.status(200).json({ success: true, botInfo, webhookInfo });
+      return res.status(200).json({
+        success: true,
+        configured: true,
+        botInfo,
+        webhookInfo,
+      });
     }
 
     // Si es POST, configurar el Webhook con la URL de Vercel
@@ -44,6 +60,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
+      configured: true,
       mensaje: 'Webhook de Telegram configurado exitosamente.',
       webhookUrl,
       bot: {
@@ -56,6 +73,10 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('[Admin Setup Webhook Error]', err);
-    return res.status(500).json({ error: err.message || 'Error al configurar Webhook en Telegram' });
+    return res.status(500).json({
+      success: false,
+      configured: true,
+      error: err.message || 'Error al configurar Webhook en Telegram',
+    });
   }
 }

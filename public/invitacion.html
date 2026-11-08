@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Activación de Usuario - Asistente Safite & RNDC</title>
+  <!-- reCAPTCHA v3 oficial de Safite -->
+  <script src="https://www.google.com/recaptcha/api.js?render=6LdqZGYnAAAAAKvNI6gpHDm57CKxEoVCXDvJ3sty"></script>
   <style>
     :root {
       --primary: #10b981;
@@ -30,8 +32,8 @@
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 1rem;
-      padding: 2.5rem;
-      max-width: 460px;
+      padding: 2.25rem;
+      max-width: 480px;
       width: 100%;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
     }
@@ -39,7 +41,6 @@
       font-size: 1.5rem;
       margin-top: 0;
       margin-bottom: 0.5rem;
-      color: var(--text);
     }
     p {
       color: var(--text-muted);
@@ -47,17 +48,39 @@
       line-height: 1.5;
       margin-bottom: 1.5rem;
     }
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 0.25rem;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: #fff;
+      background: #334155;
+    }
     .form-group {
-      margin-bottom: 1.25rem;
+      margin-bottom: 1.15rem;
     }
     label {
       display: block;
       font-size: 0.85rem;
       font-weight: 600;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.4rem;
       color: var(--text-muted);
     }
-    input {
+    input, textarea {
       width: 100%;
       background: #0f172a;
       border: 1px solid var(--border);
@@ -69,10 +92,10 @@
       outline: none;
       transition: border-color 0.2s;
     }
-    input:focus {
+    input:focus, textarea:focus {
       border-color: var(--primary);
     }
-    button {
+    button[type="submit"] {
       width: 100%;
       background: var(--primary);
       color: #fff;
@@ -85,8 +108,12 @@
       transition: background 0.2s;
       margin-top: 0.5rem;
     }
-    button:hover {
+    button[type="submit"]:hover {
       background: var(--primary-hover);
+    }
+    button[type="submit"]:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
     .result-box {
       display: none;
@@ -111,7 +138,8 @@
       padding: 0.75rem 1rem;
       border-radius: 0.5rem;
       font-size: 0.9rem;
-      margin-bottom: 1rem;
+      margin-bottom: 1.25rem;
+      border: 1px solid #7f1d1d;
     }
     .btn-telegram {
       background: #0088cc;
@@ -123,6 +151,11 @@
       border-radius: 0.5rem;
       font-weight: 600;
     }
+    .hint {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
   </style>
 </head>
 <body>
@@ -130,11 +163,24 @@
   <div class="card">
     <div id="form-container">
       <h1>🔐 Vinculación a Safite & RNDC</h1>
-      <p>Ingresa con tu usuario y contraseña de <strong>SAFITE</strong> para validar tus permisos y vincular tu cuenta al Asistente de Despachos.</p>
+      <p>Comprueba tus permisos en <strong>SAFITE</strong> para vincular tu cuenta con el Asistente de Despachos de Telegram.</p>
 
       <div id="error-msg" class="error-box"></div>
 
-      <form id="login-form">
+      <!-- Selector de método -->
+      <div class="tabs">
+        <button type="button" class="tab-btn active" id="tab-btn-cred" onclick="switchTab('cred')">NIT y Contraseña</button>
+        <button type="button" class="tab-btn" id="tab-btn-token" onclick="switchTab('token')">Pegar Token de Safite</button>
+      </div>
+
+      <!-- Formulario 1: NIT + Usuario + Clave -->
+      <form id="login-form-cred">
+        <div class="form-group">
+          <label for="nit">NIT de la Empresa</label>
+          <input type="text" id="nit" placeholder="Ej: 900123456" required autocomplete="organization">
+          <div class="hint">El NIT registrado de tu empresa en Safite (sin dígito de verificación).</div>
+        </div>
+
         <div class="form-group">
           <label for="usuario">Usuario de SAFITE</label>
           <input type="text" id="usuario" placeholder="Ej: PRUEBASAFITE" required autocomplete="username">
@@ -145,16 +191,30 @@
           <input type="password" id="password" placeholder="Tu contraseña habitual de Safite" required autocomplete="current-password">
         </div>
 
-        <button type="submit" id="btn-submit">Validar Acceso y Generar Código</button>
+        <button type="submit" id="btn-submit-cred">Validar Acceso y Generar Código</button>
+      </form>
+
+      <!-- Formulario 2: Token Directo -->
+      <form id="login-form-token" style="display: none;">
+        <div class="form-group">
+          <label for="token-safite">Token JWT de Safite</label>
+          <textarea id="token-safite" rows="4" placeholder="Pega aquí tu token eyJhbGciOiJIUzI1Ni..." required></textarea>
+          <div class="hint">
+            En tu sesión abierta de Safite en el navegador, presiona <code>F12</code> > Consola y ejecuta <code>localStorage.getItem('token')</code>.
+          </div>
+        </div>
+
+        <button type="submit" id="btn-submit-token">Vincular con este Token</button>
       </form>
     </div>
 
+    <!-- Pantalla de Éxito con Código -->
     <div id="result-container" class="result-box">
       <h2>🎉 ¡Acceso Comprobado!</h2>
-      <p>Envía el siguiente código en el chat de Telegram para completar la vinculación:</p>
+      <p id="welcome-user-text">Tu sesión en Safite es válida.</p>
+      <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Envía el siguiente código en el chat de Telegram:</p>
       <div id="code-text" class="code-display">------</div>
-      <p style="font-size: 0.85rem;">Copia y pega este comando en el bot:</p>
-      <input type="text" id="command-copy" readonly style="text-align: center; font-weight: bold; margin-bottom: 1rem;">
+      <input type="text" id="command-copy" readonly style="text-align: center; font-weight: bold; margin-bottom: 1rem; width: 100%;">
       <a id="btn-open-tg" class="btn-telegram" href="#" target="_blank">Abrir Bot de Telegram</a>
     </div>
   </div>
@@ -162,6 +222,7 @@
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const tokenInvitacion = urlParams.get('token');
+    let currentTab = 'cred';
 
     if (!tokenInvitacion) {
       document.getElementById('form-container').innerHTML = `
@@ -170,12 +231,71 @@
       `;
     }
 
-    document.getElementById('login-form')?.addEventListener('submit', async (e) => {
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById('error-msg').style.display = 'none';
+      if (tab === 'cred') {
+        document.getElementById('tab-btn-cred').classList.add('active');
+        document.getElementById('tab-btn-token').classList.remove('active');
+        document.getElementById('login-form-cred').style.display = 'block';
+        document.getElementById('login-form-token').style.display = 'none';
+      } else {
+        document.getElementById('tab-btn-token').classList.add('active');
+        document.getElementById('tab-btn-cred').classList.remove('active');
+        document.getElementById('login-form-cred').style.display = 'none';
+        document.getElementById('login-form-token').style.display = 'block';
+      }
+    }
+
+    // Enviar con Credenciales (NIT + Usuario + Clave)
+    document.getElementById('login-form-cred')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const btn = document.getElementById('btn-submit');
+      const btn = document.getElementById('btn-submit-cred');
       const errBox = document.getElementById('error-msg');
       btn.disabled = true;
       btn.innerText = 'Validando contra SAFITE...';
+      errBox.style.display = 'none';
+
+      try {
+        let recaptchaToken = '';
+        if (window.grecaptcha) {
+          recaptchaToken = await grecaptcha.execute('6LdqZGYnAAAAAKvNI6gpHDm57CKxEoVCXDvJ3sty', { action: 'submitUser' }).catch(() => '');
+        }
+
+        const res = await fetch('/api/auth/safite-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tokenInvitacion,
+            metodo: 'credenciales',
+            nit: document.getElementById('nit').value,
+            usuario: document.getElementById('usuario').value,
+            password: document.getElementById('password').value,
+            recaptchaToken,
+            canal: 'TELEGRAM'
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al validar credenciales en Safite');
+
+        mostrarExito(data);
+      } catch (err) {
+        errBox.innerHTML = `<strong>Error:</strong> ${err.message}<br><small>Si Safite solicita 2FA o CAPTCHA en tu empresa, puedes usar la pestaña <em>"Pegar Token de Safite"</em>.</small>`;
+        errBox.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Validar Acceso y Generar Código';
+      }
+    });
+
+    // Enviar con Token directo
+    document.getElementById('login-form-token')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-submit-token');
+      const errBox = document.getElementById('error-msg');
+      btn.disabled = true;
+      btn.innerText = 'Verificando token en Safite...';
       errBox.style.display = 'none';
 
       try {
@@ -184,34 +304,38 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             tokenInvitacion,
-            usuario: document.getElementById('usuario').value,
-            password: document.getElementById('password').value,
+            metodo: 'token',
+            tokenSafite: document.getElementById('token-safite').value,
             canal: 'TELEGRAM'
           })
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Error al validar credenciales');
+        if (!res.ok) throw new Error(data.error || 'Token inválido o expirado');
 
-        document.getElementById('form-container').style.display = 'none';
-        document.getElementById('result-container').style.display = 'block';
-        document.getElementById('code-text').innerText = data.codigoVinculacion;
-        document.getElementById('command-copy').value = `VINCULAR ${data.codigoVinculacion}`;
-
-        // Link directo para abrir Telegram
-        const botUsername = window.TELEGRAM_BOT_USERNAME || '';
-        if (botUsername) {
-          document.getElementById('btn-open-tg').href = `https://t.me/${botUsername}?start=vincular_${data.codigoVinculacion}`;
-        }
+        mostrarExito(data);
       } catch (err) {
         errBox.innerText = err.message;
         errBox.style.display = 'block';
       } finally {
         btn.disabled = false;
-        btn.innerText = 'Validar Acceso y Generar Código';
+        btn.innerText = 'Vincular con este Token';
       }
     });
+
+    function mostrarExito(data) {
+      document.getElementById('form-container').style.display = 'none';
+      document.getElementById('result-container').style.display = 'block';
+      document.getElementById('welcome-user-text').innerText = `Usuario identificado: ${data.usuarioSafite}`;
+      document.getElementById('code-text').innerText = data.codigoVinculacion;
+      document.getElementById('command-copy').value = `VINCULAR ${data.codigoVinculacion}`;
+
+      if (data.telegramBotUrl) {
+        document.getElementById('btn-open-tg').href = data.telegramBotUrl;
+      } else if (data.telegramBotUsername) {
+        document.getElementById('btn-open-tg').href = `https://t.me/${data.telegramBotUsername}?start=vincular_${data.codigoVinculacion}`;
+      }
+    }
   </script>
 </body>
 </html>
-

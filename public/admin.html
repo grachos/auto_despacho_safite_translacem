@@ -426,16 +426,18 @@
         const res = await fetch('/api/admin/setup-webhook', {
           headers: { 'x-admin-key': adminKey }
         });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.webhookInfo?.url) {
-            statusLabel.innerHTML = `✅ Conectado con <strong>@${data.botInfo?.username || 'Bot'}</strong> (${data.webhookInfo.url})`;
-          } else {
-            statusLabel.innerText = `⚠️ Bot @${data.botInfo?.username || ''} sin webhook activo. Haz clic en Vincular.`;
-          }
+        const data = await res.json();
+        if (data.configured === false) {
+          statusLabel.innerHTML = `<span style="color: #f59e0b;">⚠️ ${data.message || data.error}</span>`;
+          return;
         }
-      } catch {
-        statusLabel.innerText = 'No configurado';
+        if (data.webhookInfo?.url) {
+          statusLabel.innerHTML = `✅ Conectado con <strong>@${data.botInfo?.username || 'Bot'}</strong> (${data.webhookInfo.url})`;
+        } else {
+          statusLabel.innerHTML = `⚠️ Bot <strong>@${data.botInfo?.username || ''}</strong> sin webhook activo. Haz clic en el botón azul para vincularlo.`;
+        }
+      } catch (err) {
+        statusLabel.innerText = 'Error al verificar Telegram: ' + err.message;
       }
     }
 
@@ -451,11 +453,12 @@
           headers: { 'x-admin-key': adminKey }
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Error al vincular Webhook');
+        if (!data.success) throw new Error(data.error || 'Error al vincular Webhook');
 
         alert(`🎉 ¡Éxito! Webhook conectado con el bot @${data.bot.username}`);
         statusLabel.innerHTML = `✅ Conectado con <strong>@${data.bot.username}</strong>`;
       } catch (err) {
+        statusLabel.innerHTML = `<span style="color: #fca5a5;">❌ ${err.message}</span>`;
         alert('Error: ' + err.message);
       } finally {
         btn.disabled = false;
