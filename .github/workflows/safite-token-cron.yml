@@ -29,14 +29,14 @@ jobs:
 
       - name: Ejecutar Renovación Playwright
         env:
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST || 'srv2184.hstgr.io' }}
-          MYSQL_USER: ${{ secrets.MYSQL_USER || 'u279856486_safiteTnslaCem' }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD || 'b!vL@Zc7Y' }}
-          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE || 'u279856486_safiteTnslaCem' }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
           MYSQL_PORT: ${{ secrets.MYSQL_PORT || '3306' }}
           MYSQL_SSL: ${{ secrets.MYSQL_SSL || 'false' }}
-          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY || 'clave_secreta_super_segura_32_caracteres_minimo!' }}
-          SAFITE_LOGIN_URL: ${{ secrets.SAFITE_LOGIN_URL || 'https://app.safiteapp.com/login.html?keyCompany=LVY7SMEezWqi7lO739SQcu6SoQtu819JU64ddFhBjY' }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          SAFITE_LOGIN_URL: ${{ secrets.SAFITE_LOGIN_URL || 'https://app.safiteapp.com/login.html?nit=901599040-4&keyCompany=LVY7SMEezWqi7lO739SQcu6SoQtu819JU64ddFhBjY' }}
           SAFITE_NIT: ${{ secrets.SAFITE_NIT || '901599040-4' }}
           SAFITE_ID_EMPRESA: ${{ secrets.SAFITE_ID_EMPRESA || '1282' }}
         run: |
