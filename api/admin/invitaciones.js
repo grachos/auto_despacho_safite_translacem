@@ -11,10 +11,11 @@ export default async function handler(req, res) {
   }
 
   // Validación de seguridad de Administrador
-  const adminKey = req.headers['x-admin-key'] || req.body?.adminKey;
-  const expectedKey = process.env.ADMIN_KEY;
+  const adminKey = req.headers['x-admin-key'] || req.query.adminKey || req.body?.adminKey;
+  const expectedKey = (process.env.ADMIN_KEY || '').trim().replace(/^["']|["']$/g, '');
+  const providedKey = (adminKey || '').trim().replace(/^["']|["']$/g, '');
 
-  if (expectedKey && adminKey !== expectedKey) {
+  if (expectedKey && providedKey !== expectedKey) {
     return res.status(401).json({ error: 'No autorizado. Se requiere x-admin-key válida.' });
   }
 
