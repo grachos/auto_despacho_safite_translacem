@@ -51,8 +51,8 @@ export class TelegramBotClient {
     const payload = {
       chat_id: chatId,
       text,
-      parse_mode: parseMode,
     };
+    if (parseMode) payload.parse_mode = parseMode;
     if (replyMarkup) {
       payload.reply_markup = replyMarkup;
     }
