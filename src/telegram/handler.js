@@ -171,18 +171,13 @@ export async function handleTelegramUpdate(update) {
     if (!texto) return;
 
     // -----------------------------------------------------------------------
-    // COMANDO DE VINCULACIÓN: VINCULAR 123456
+    // COMANDO DE VINCULACIÓN: VINCULAR 123456 o /start vincular_123456
     // -----------------------------------------------------------------------
-    if (texto.toUpperCase().startsWith('VINCULAR')) {
-      const partes = texto.split(/\s+/);
-      const codigo = partes[1];
+    const startVincularMatch = texto.match(/^\/start\s+vincular_?(\d+)/i);
+    const vincularMatch = texto.match(/^VINCULAR\s+(\d+)/i);
 
-      if (!codigo || codigo.length < 5) {
-        return bot.sendMessage(
-          chatId,
-          'ℹ️ Formato incorrecto. Debes enviar la palabra *VINCULAR* seguida del código de 6 dígitos.\nEjemplo: `VINCULAR 123456`'
-        );
-      }
+    if (startVincularMatch || vincularMatch) {
+      const codigo = (startVincularMatch ? startVincularMatch[1] : vincularMatch[1]).trim();
 
       const linkedUser = await linkTelegramUser(codigo, chatId, username);
       if (!linkedUser) {

@@ -80,7 +80,7 @@ export async function loginWithNit(nit, usuario, password, recaptchaToken = '') 
     token: recaptchaToken,
   });
 
-  let idEmpresa = 1;
+  let idEmpresa = 1282; // ID de empresa por defecto para TRASLACEM SAS
   try {
     const resEmpresa = await fetch(urlEmpresas, {
       method: 'POST',
@@ -95,10 +95,10 @@ export async function loginWithNit(nit, usuario, password, recaptchaToken = '') 
 
     const dataEmpresa = await resEmpresa.json().catch(() => ({}));
     if (dataEmpresa.empresas && dataEmpresa.empresas.length > 0) {
-      idEmpresa = dataEmpresa.empresas[0].id || dataEmpresa.idEmpresa || 1;
+      idEmpresa = dataEmpresa.empresas[0].ID || dataEmpresa.empresas[0].id || dataEmpresa.idEmpresa || 1282;
     }
   } catch (e) {
-    console.warn('[Safite Login] No se pudo obtener idEmpresa, usando por defecto:', e.message);
+    console.warn('[Safite Login] No se pudo obtener idEmpresa, usando por defecto (1282):', e.message);
   }
 
   // 2. Autenticar usuario y contraseña en Safite
