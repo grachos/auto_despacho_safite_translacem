@@ -58,12 +58,29 @@ export async function loginWithBrowser(browser, { usuario, password, idEmpresa }
 
   try {
     mark('goto_login');
-    await Promise.all([
+    const [empresasRes] = await Promise.all([
       page.waitForResponse((r) => r.url().includes('obtenerEmpresas'), { timeout: 35000 }),
       page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 35000 }),
     ]);
     mark('wait_form');
-    await page.waitForSelector('#nameUserL', { state: 'visible', timeout: 20000 });
+    try {
+      await page.waitForSelector('#nameUserL', { state: 'visible', timeout: 20000 });
+    } catch (e) {
+      // Diagnostics: what does Safite actually show to this IP?
+      const body = await empresasRes.text().catch(() => '');
+      const visible = await page
+        .evaluate(() => (document.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 300))
+        .catch(() => '');
+      const diag = {
+        pageUrl: page.url().split('?')[0],
+        title: await page.title().catch(() => ''),
+        empresasStatus: empresasRes.status(),
+        empresasBody: body.slice(0, 300),
+        visibleText: visible,
+      };
+      throw new Error(`Formulario de login no apareció. ${JSON.stringify(diag)}`);
+    }
+    mark('form_visible');
     mark('typing');
 
     await page.click('#nameUserL');
