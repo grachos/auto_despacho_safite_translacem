@@ -14,13 +14,29 @@ export class TelegramBotClient {
 
   async _request(method, payload = {}) {
     const url = `${this.baseUrl}/${method}`;
-    const res = await fetch(url, {
+    let res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
+    let data = await res.json();
+
+    // Manejo inteligente de Rate Limiting (HTTP 429) de Telegram
+    if (!data.ok && data.error_code === 429) {
+      const waitSeconds = data.parameters?.retry_after || 1;
+      const waitMs = (waitSeconds * 1000) + 300;
+      console.warn(`[Telegram] Rate limit (429) en ${method}. Esperando ${waitSeconds}s antes de reintentar...`);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      data = await res.json();
+    }
+
     if (!data.ok) {
       console.error(`[Telegram] Error en ${method}:`, data);
       throw new Error(`Error de Telegram (${data.error_code}): ${data.description}`);
@@ -96,6 +112,20 @@ export class TelegramBotClient {
    */
   getFileDownloadUrl(filePath) {
     return `https://api.telegram.org/file/bot${this.token}/${filePath}`;
+  }
+
+  /**
+   * Obtiene la información del bot actual (ej. username @MiBot)
+   */
+  async getMe() {
+    return this._request('getMe');
+  }
+
+  /**
+   * Obtiene el estado actual del webhook configurado en Telegram
+   */
+  async getWebhookInfo() {
+    return this._request('getWebhookInfo');
   }
 
   /**

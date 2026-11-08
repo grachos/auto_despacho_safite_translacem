@@ -132,3 +132,18 @@ export async function loginWithNit(nit, usuario, password, recaptchaToken = '') 
   // Validar y decodificar el token retornado
   return await validateSafiteToken(authData.token);
 }
+
+/**
+ * Autentica usuario y contraseña en Safite (wrapper compatible)
+ */
+export async function authenticateWithSafite(usuario, password, nit = process.env.SAFITE_NIT || '') {
+  return loginWithNit(nit, usuario, password);
+}
+
+/**
+ * Refresca o revalida un token existente de Safite
+ */
+export async function refreshSafiteToken(token) {
+  return validateSafiteToken(token);
+}
+

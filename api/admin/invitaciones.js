@@ -27,7 +27,9 @@ export default async function handler(req, res) {
 
   try {
     const { token, expiresAt } = await createInvitation(nombreDestinatario, creadoPor);
-    const baseUrl = process.env.VERCEL_PROJECT_URL || 'https://tu-proyecto.vercel.app';
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+    const baseUrl = process.env.VERCEL_PROJECT_URL || (host ? `${proto}://${host}` : 'https://tu-proyecto.vercel.app');
     const linkInvitacion = `${baseUrl.replace(/\/$/, '')}/invitacion.html?token=${token}`;
 
     return res.status(200).json({

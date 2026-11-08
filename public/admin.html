@@ -469,7 +469,14 @@
     // Crear invitación
     document.getElementById('invite-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const nombre = document.getElementById('invite-name').value;
+      const nombreInput = document.getElementById('invite-name');
+      const nombre = nombreInput.value.trim();
+      const btn = e.target.querySelector('button[type="submit"]');
+
+      if (!nombre) return;
+
+      btn.disabled = true;
+      btn.innerText = 'Generando...';
 
       try {
         const res = await fetch('/api/admin/invitaciones', {
@@ -482,13 +489,16 @@
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
+        if (!res.ok) throw new Error(data.error || 'Error al generar la invitación');
 
         document.getElementById('invite-url').value = data.linkInvitacion;
         document.getElementById('invite-result').style.display = 'block';
-        document.getElementById('invite-name').value = '';
+        nombreInput.value = '';
       } catch (err) {
         alert('Error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Generar Enlace';
       }
     });
 
