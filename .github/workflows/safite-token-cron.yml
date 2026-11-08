@@ -12,20 +12,40 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    concurrency:
+      group: safite-token-renewal
+      cancel-in-progress: false
+
     steps:
       - name: Checkout Repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js 20
+      - name: Configurar Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Instalar Dependencias de Playwright
         run: |
-          npm install playwright mysql2 dotenv
-          npx playwright install --with-deps chrome chromium
+          npm ci
+          npx playwright-core install --with-deps chrome
+
+      - name: Verificar secrets requeridos
+        env:
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          SAFITE_LOGIN_URL: ${{ secrets.SAFITE_LOGIN_URL }}
+          SAFITE_ID_EMPRESA: ${{ secrets.SAFITE_ID_EMPRESA }}
+        run: |
+          missing=0
+          for v in MYSQL_HOST MYSQL_USER MYSQL_PASSWORD MYSQL_DATABASE ENCRYPTION_KEY SAFITE_LOGIN_URL SAFITE_ID_EMPRESA; do
+            if [ -z "${!v}" ]; then echo "::error::Falta el secret $v"; missing=1; fi
+          done
+          exit $missing
 
       - name: Ejecutar Renovación Playwright
         env:
@@ -40,7 +60,7 @@ jobs:
           SAFITE_NIT: ${{ secrets.SAFITE_NIT }}
           SAFITE_ID_EMPRESA: ${{ secrets.SAFITE_ID_EMPRESA }}
         run: |
-          node scripts/safite-auto-login.js
+          node scripts/safite-auto-login.js --all
 
       - name: Subir Capturas en Caso de Error
         if: failure()

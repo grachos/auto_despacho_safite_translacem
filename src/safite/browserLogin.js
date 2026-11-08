@@ -113,6 +113,12 @@ export async function loginWithBrowser(browser, { usuario, password, idEmpresa }
     if (!token) throw new Error('No se encontró el token JWT tras el login.');
 
     return { token, expiresAt: jwtExpiry(token) };
+  } catch (err) {
+    // Local/CI only: keep a screenshot for the workflow's "upload artifact on failure" step.
+    if (!process.env.VERCEL) {
+      await page.screenshot({ path: `error-login-${usuario}.png`, fullPage: true }).catch(() => {});
+    }
+    throw err;
   } finally {
     await context.close().catch(() => {});
   }
