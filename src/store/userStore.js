@@ -198,3 +198,26 @@ export async function logDispatch({ userId, canal, numeroManifiesto, radicadoRnd
   );
 }
 
+// =========================================================================
+// GESTIÓN DE ACCESOS Y ELIMINACIÓN DE USUARIOS
+// =========================================================================
+
+export async function deleteUser(userId) {
+  // 1. Eliminar logs de despachos asociados a este usuario
+  await query('DELETE FROM despachos_log WHERE usuario_id = ?', [userId]);
+  // 2. Eliminar códigos de vinculación
+  await query('DELETE FROM codigos_vinculacion WHERE usuario_id = ?', [userId]);
+  // 3. Eliminar usuario
+  const res = await query('DELETE FROM usuarios WHERE id = ?', [userId]);
+  return res.affectedRows > 0;
+}
+
+export async function unlinkTelegramUser(userId) {
+  const res = await query(
+    'UPDATE usuarios SET telegram_chat_id = NULL, telegram_username = NULL, status = "NEEDS_RELINK" WHERE id = ?',
+    [userId]
+  );
+  return res.affectedRows > 0;
+}
+
+

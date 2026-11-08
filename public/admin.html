@@ -262,10 +262,11 @@
               <th>Telegram</th>
               <th>WhatsApp</th>
               <th>Estado</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="users-table">
-            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Cargando...</td></tr>
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Cargando...</td></tr>
           </tbody>
         </table>
       </div>
@@ -398,8 +399,14 @@
           <td>${u.telegram_chat_id ? '✅ Vinculado (@' + (u.telegram_username || u.telegram_chat_id) + ')' : '⏳ Pendiente'}</td>
           <td>${u.whatsapp_phone ? '✅ ' + u.whatsapp_phone : '—'}</td>
           <td><span class="badge badge-active">${u.status}</span></td>
+          <td>
+            <div style="display: flex; gap: 0.4rem; align-items: center;">
+              ${u.telegram_chat_id ? `<button onclick="desvincularTelegram(${u.id}, '${u.nombre.replace(/'/g, "\\'")}')" style="background: #eab308; color: #000; padding: 0.25rem 0.5rem; font-size: 0.75rem;">🔓 Desvincular</button>` : ''}
+              <button onclick="eliminarUsuario(${u.id}, '${u.nombre.replace(/'/g, "\\'")}')" style="background: #dc2626; color: #fff; padding: 0.25rem 0.5rem; font-size: 0.75rem;">🗑️ Eliminar</button>
+            </div>
+          </td>
         </tr>
-      `).join('') : '<tr><td colspan="5" style="text-align: center;">No hay usuarios registrados aún.</td></tr>';
+      `).join('') : '<tr><td colspan="6" style="text-align: center;">No hay usuarios registrados aún.</td></tr>';
 
       // Tabla Despachos
       const dispTbody = document.getElementById('dispatches-table');
@@ -507,6 +514,50 @@
       copyText.select();
       navigator.clipboard.writeText(copyText.value);
       alert('¡Enlace de invitación copiado al portapapeles!');
+    }
+
+    async function desvincularTelegram(userId, nombre) {
+      if (!confirm(`¿Estás seguro de desvincular Telegram para "${nombre}"?\nEl usuario conservará sus credenciales de Safite pero deberá volver a vincular su chat.`)) {
+        return;
+      }
+      try {
+        const res = await fetch('/api/admin/usuarios', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': adminKey
+          },
+          body: JSON.stringify({ id: userId, action: 'unlink' })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al desvincular');
+        alert(data.mensaje || 'Telegram desvinculado.');
+        cargarDatos();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    async function eliminarUsuario(userId, nombre) {
+      if (!confirm(`⚠️ ¿Estás seguro de ELIMINAR por completo el usuario "${nombre}"?\nSe borrarán sus accesos y vinculaciones para que pueda volver a crearse desde cero.`)) {
+        return;
+      }
+      try {
+        const res = await fetch('/api/admin/usuarios', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': adminKey
+          },
+          body: JSON.stringify({ id: userId, action: 'delete' })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al eliminar usuario');
+        alert(data.mensaje || 'Usuario eliminado exitosamente.');
+        cargarDatos();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
     }
   </script>
 </body>
