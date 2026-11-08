@@ -4,6 +4,10 @@
   "functions": {
     "api/**/*.js": {
       "maxDuration": 60
+    },
+    "api/cron/renew-tokens.js": {
+      "maxDuration": 60,
+      "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
     }
   },
   "crons": [
