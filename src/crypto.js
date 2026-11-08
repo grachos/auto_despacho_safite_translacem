@@ -7,7 +7,10 @@ import crypto from 'node:crypto';
 const ALGORITHM = 'aes-256-gcm';
 
 function getEncryptionKey() {
-  const secret = process.env.ENCRYPTION_KEY || 'default_secret_key_32_bytes_length!!';
+  const secret = process.env.ENCRYPTION_KEY;
+  if (!secret || secret.length < 32) {
+    throw new Error('ENCRYPTION_KEY no configurada o demasiado corta (mínimo 32 caracteres).');
+  }
   return crypto.createHash('sha256').update(secret).digest();
 }
 

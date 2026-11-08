@@ -13,11 +13,12 @@ import 'dotenv/config';
 import { query } from '../src/db/mysql.js';
 import { decrypt } from '../src/crypto.js';
 
-const SAFITE_NIT = process.env.SAFITE_NIT || '901599040-4';
-const DEFAULT_ID_EMPRESA = process.env.SAFITE_ID_EMPRESA || '1282';
-
-const SAFITE_LOGIN_URL = process.env.SAFITE_LOGIN_URL || 
-  `https://app.safiteapp.com/login.html?nit=${SAFITE_NIT}&keyCompany=LVY7SMEezWqi7lO739SQcu6SoQtu819JU64ddFhBjY`;
+const DEFAULT_ID_EMPRESA = process.env.SAFITE_ID_EMPRESA;
+const SAFITE_LOGIN_URL = process.env.SAFITE_LOGIN_URL;
+if (!SAFITE_LOGIN_URL || !DEFAULT_ID_EMPRESA) {
+  console.error('Faltan SAFITE_LOGIN_URL y/o SAFITE_ID_EMPRESA.');
+  process.exit(1);
+}
 
 /**
  * Autentica un usuario en Safite y extrae su token JWT
@@ -183,15 +184,8 @@ async function main() {
   }
 
   if (usersToRenew.length === 0) {
-    const envUser = process.env.SAFITE_USER || 'PRUEBASAFITE';
-    const envPass = process.env.SAFITE_PASSWORD || 'SAFITE123/*';
-    usersToRenew.push({
-      id: 1,
-      nombre: 'Usuario Principal',
-      safite_usuario: envUser,
-      plainPassword: envPass,
-      idEmpresa: DEFAULT_ID_EMPRESA,
-    });
+    console.log('No hay usuarios para renovar.');
+    process.exit(0);
   }
 
   console.log(`📋 Despachadores a renovar en esta ronda: ${usersToRenew.length}`);

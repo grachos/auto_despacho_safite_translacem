@@ -9,6 +9,7 @@
  */
 
 import { SafiteToolDispatcher } from '../src/agentTools.js';
+import { requireAdmin } from '../src/auth/guards.js';
 
 export const config = {
   maxDuration: 60,
@@ -18,6 +19,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido. Use POST.' });
   }
+
+  if (!requireAdmin(req, res)) return;
 
   const { message, action, numeroManifiesto } = req.body || {};
   const dispatcher = new SafiteToolDispatcher();
